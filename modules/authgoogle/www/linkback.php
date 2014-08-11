@@ -10,14 +10,12 @@
  * @version $Id$
  */
 
-$session = SimpleSAML_Session::getInstance();
+$stateId = $_REQUEST['state'];
+$state = SimpleSAML_Auth_State::loadState($stateId, sspmod_authgoogle_Auth_Source_Google::STAGE_INIT);
 
-
-$stateId = $session->getData('string','authStateId');
-$state = SimpleSAML_Auth_State::loadState($stateId, sspmod_authgoogle_Auth_Source_GoogleOIDC::STAGE_INIT);
-
+// https://developers.google.com/accounts/docs/OAuth2Login
 if (array_key_exists('code', $_REQUEST)) {
-	$session = SimpleSAML_Session::getInstance();
+
 	SimpleSAML_Logger::debug('Google authorization code => ' . $_REQUEST['code']);
 
 	// Good
@@ -41,10 +39,11 @@ if (array_key_exists('code', $_REQUEST)) {
 
 if (isset($state))
 {
+SimpleSAML_Logger::debug('Google auth stateId => ' . $state );
+
 /* Find authentication source. */
-assert('array_key_exists(sspmod_authgoogle_Auth_Source_GoogleOIDC::AUTHID, $state)');
-$sourceId = $state[sspmod_authgoogle_Auth_Source_GoogleOIDC::AUTHID];
-SimpleSAML_Logger::debug('Google sourceID => ' . $sourceId);
+assert('array_key_exists(sspmod_authgoogle_Auth_Source_Google::AUTHID, $state)');
+$sourceId = $state[sspmod_authgoogle_Auth_Source_Google::AUTHID];
 
 $source = SimpleSAML_Auth_Source::getById($sourceId);
 if ($source === NULL) {
