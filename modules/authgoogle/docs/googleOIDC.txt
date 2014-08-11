@@ -1,0 +1,76 @@
+GOOGLE OpenID connect auth module
+
+
+References
+https://code.google.com/p/google-api-php-client/wiki/OAuth2
+https://developers.google.com/accounts/docs/OAuth2Login
+Lits of Google APIs scopes: http://stackoverflow.com/questions/10664868/where-can-i-find-a-list-of-scopes-for-googles-oauth-2-0-api
+
+
+create services and API access
+
+insert into authsources.php new authgoogleOIDC with client_id and secret
+
+
+
+Referebnce Link
+
+
+
+1) get code to request access token
+
+https://accounts.google.com/o/oauth2/auth?
+client_id=3....apps.googleusercontent.com&
+redirect_uri=https://your_hostname/module.php/authgoogleOIDC/linkback.php&
+scope=openid+profile+email
+response_type=code&
+access_type=online&
+client_state=
+
+2) Google Login
+
+3) Consent access
+
+
+4) get the code in returned URL
+
+https://your_hostname/module.php/authgoogleapi/linkback.php?code=4/vDiF8jL...
+
+
+5) put the code in POST request to get the access token in response
+
+https://accounts.google.com/o/oauth2/token?
+code=4/vDiF8jLaXAv0gqWWwjTOaNgfmtKo.wsozULSrJlQToiIBeO6P2m8UucWvjgI
+client_id=2......apps.googleusercontent.com&
+client_secret=8J......
+redirect_uri=https://your_hostname/module.php/authgoogleOIDC/linkback.php&
+grant_type=authorization_code
+
+6) get the access token in response
+
+https://accounts.google.com/o/oauth2/token?
+code=4/vDiF8jLaXAv0....
+client_id=2.....apps.googleusercontent.com&
+client_secret=2J....
+redirect_uri=https://your_hostname/module.php/authgoogleOIDC/linkback.php&
+grant_type=authorization_code
+
+
+
+returned Google attributes for user profile and email:
+log:
+Google Response: {
+ "kind": "plus#personOpenIdConnect",
+ "gender": "male",
+ "sub": "2...",
+ "name": "S.....",
+ "given_name": "Sylvain",
+ "family_name": "Medard",
+ "profile": "https://plus.google.com/2...",
+ "picture": "https://l...",
+ "email": "...",
+ "email_verified": "true",
+ "locale": "fr"
+}
+
+
