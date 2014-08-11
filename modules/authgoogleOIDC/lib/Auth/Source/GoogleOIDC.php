@@ -5,7 +5,7 @@
  * @author Sylvain MEDARD
  * @version $Id$
  */
-set_include_path(get_include_path() . PATH_SEPARATOR . '/var/idpgoogle/modules/authgoogleOIDC/extlibinc/src');
+set_include_path(get_include_path() . PATH_SEPARATOR . 'path_to_lib/src');
 
 require_once 'Google/Client.php';
 require_once 'Google/Service/Oauth2.php';
@@ -137,10 +137,7 @@ class sspmod_authgoogleOIDC_Auth_Source_GoogleOIDC extends SimpleSAML_Auth_Sourc
 				$objOAuthService = new Google_Service_Oauth2($this->client);
 				
 				$results = $objOAuthService->userinfo->get();
-				foreach($results as $key => $value)
-				{
-					SimpleSAML_Logger::debug('Google userinfo : '.$key.' : '.$value);
-				}
+				SimpleSAML_Logger::debug('Google userinfo : ' .  var_export($results, true));
 				$attributes = array();
 				$attributes['google_uid'] = array($results['id']); 
 				$attributes['google_name'] = array($results['name']);
