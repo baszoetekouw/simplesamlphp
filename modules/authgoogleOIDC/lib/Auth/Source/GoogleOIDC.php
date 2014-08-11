@@ -5,7 +5,7 @@
  * @author Sylvain MEDARD
  * @version $Id$
  */
-set_include_path(get_include_path() . PATH_SEPARATOR . 'path_to_lib/src');
+set_include_path(get_include_path() . PATH_SEPARATOR . 'path-to/src');
 
 require_once 'Google/Client.php';
 require_once 'Google/Service/Oauth2.php';
@@ -27,18 +27,23 @@ class sspmod_authgoogleOIDC_Auth_Source_GoogleOIDC extends SimpleSAML_Auth_Sourc
 
 	const federated_signon_certs_url = 'https://www.googleapis.com/oauth2/v1/certs';
 
-	// Google Developper Console :
-	// https://code.google.com/apis/console
+	/**
+	 * Client ID & Client secret 
+	 * from Google Developper Console : 
+	 * https://code.google.com/apis/console
+	 */ 
 	private $key;
 	private $secret;
 	
-	// Redirect_uri
+	/** 
+	 * Redirect_uri
+	 */
 	private $linkback; 
 	
-	// Google_client
+	/**
+	 *  Google_client
+	 */
 	private $client;
-	// Google_Service_Oauth2
-	//private $objOAuthService ;
 	
 		/**
 		* Constructor for Google authentication source.
@@ -137,7 +142,10 @@ class sspmod_authgoogleOIDC_Auth_Source_GoogleOIDC extends SimpleSAML_Auth_Sourc
 				$objOAuthService = new Google_Service_Oauth2($this->client);
 				
 				$results = $objOAuthService->userinfo->get();
-				SimpleSAML_Logger::debug('Google userinfo : ' .  var_export($results, true));
+				foreach($results as $key => $value)
+				{
+					SimpleSAML_Logger::debug('Google userinfo : '.$key.' : '.$value);
+				}
 				$attributes = array();
 				$attributes['google_uid'] = array($results['id']); 
 				$attributes['google_name'] = array($results['name']);
