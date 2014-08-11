@@ -3,8 +3,9 @@
 /**
  * Authenticate using LiveID.
  *
- * @author Brook Schofield, TERENA.
+ * @author Cristiano Valli, Consortium GARR.
  * @package simpleSAMLphp
+ * @version $Id$
  */
 class sspmod_authwindowslive_Auth_Source_LiveID extends SimpleSAML_Auth_Source {
 
@@ -21,6 +22,17 @@ class sspmod_authwindowslive_Auth_Source_LiveID extends SimpleSAML_Auth_Source {
 	private $key;
 	private $secret;
 
+	private function curl_file_get_contents($url)
+	{
+    		$ch = curl_init();
+    		$timeout = 5; // set to zero for no timeout
+    		curl_setopt($ch, CURLOPT_URL, $url);
+    		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+    		$file_contents = curl_exec($ch);
+    		curl_close($ch);
+    		return $file_contents;
+	}
 
 	/**
 	 * Constructor for this authentication source.
@@ -57,83 +69,104 @@ class sspmod_authwindowslive_Auth_Source_LiveID extends SimpleSAML_Auth_Source {
 
 		/* We are going to need the authId in order to retrieve this authentication source later. */
 		$state[self::AUTHID] = $this->authId;
-
+		SimpleSAML_Logger::debug('$$$$authwindowslive auth state  = ' . $state['SimpleSAML_Auth_Default.Return']);
+		SimpleSAML_Logger::debug('$$$$authwindowslive auth state  = ' . $state['SimpleSAML_Auth_Default.id']);
+		SimpleSAML_Logger::debug('$$$$authwindowslive auth state  = ' . $state['SimpleSAML_Auth_Default.ErrorURL']);
+		SimpleSAML_Logger::debug('$$$$authwindowslive auth state  = ' . $state['LogoutCallback']);
 		$stateID = SimpleSAML_Auth_State::saveState($state, self::STAGE_INIT);
 
 		SimpleSAML_Logger::debug('authwindowslive auth state id = ' . $stateID);
 
 		// Authenticate the user
-		// Documentation at: http://msdn.microsoft.com/en-us/library/ff749771.aspx
-		$authorizeURL = 'https://consent.live.com/Connect.aspx'
-				. '?wrap_client_id=' . $this->key
-				. '&wrap_callback=' . urlencode(SimpleSAML_Module::getModuleUrl('authwindowslive') . '/linkback.php')
-				. '&wrap_client_state=' . urlencode($stateID)
-				. '&wrap_scope=WL_Profiles.View,Messenger.SignIn'
-		;
+		// Documentation at:  http://msdn.microsoft.com/en-us/library/live/hh243641
+		// http://msdn.microsoft.com/en-us/library/live/hh243647.aspx
 
-                SimpleSAML_Utilities::redirectTrustedURL($authorizeURL);
+                $authorizeURL = 'https://login.live.com/oauth20_authorize.srf'
+                                . '?client_id=' . $this->key
+                                . '&scope=' . urlencode('wl.signin,wl.basic,wl.emails')
+                                . '&response_type=code'
+                                . '&redirect_uri=' . urlencode(SimpleSAML_Module::getModuleUrl('authwindowslive') . '/linkback.php?wrap_client_state='.urlencode($stateID))            
+                                . '&wrap_client_state=' . urlencode($stateID)
+                ;
+	
+	
+		SimpleSAML_Logger::debug('LIVE state: '.$state);
+
+                SimpleSAML_Utilities::redirect($authorizeURL);
 	}
 
 
 
 	public function finalStep(&$state) {
+		assert('is_array($state)');
+		$stateID = SimpleSAML_Auth_State::getStateId($state);
 
 		SimpleSAML_Logger::debug("oauth wrap:  Using this verification code [" .
 			$state['authwindowslive:wrap_verification_code'] . "]");
 
 		// Retrieve Access Token
-		// Documentation at: http://msdn.microsoft.com/en-us/library/ff749686.aspx
-		$postData = 'wrap_client_id=' . urlencode($this->key)
-				. '&wrap_client_secret=' . urlencode($this->secret)
-				. '&wrap_callback=' . urlencode(SimpleSAML_Module::getModuleUrl('authwindowslive') . '/linkback.php')
-				. '&wrap_verification_code=' . urlencode($state['authwindowslive:wrap_verification_code']);
-
-		$context = array(
-			'http' => array(
-				'method'  => 'POST',
-				'header'  => 'Content-type: application/x-www-form-urlencoded',
-				'content' => $postData,
-			),
+		// Documentation at:  http://msdn.microsoft.com/en-us/library/live/hh243641
+		// http://msdn.microsoft.com/en-us/library/live/hh243647.aspx
+		$auth_code = $state['authwindowslive:wrap_verification_code'];
+		$redirect_uri = SimpleSAML_Module::getModuleUrl('authwindowslive') . '/linkback.php?wrap_client_state='.urlencode($stateID);
+		$fields=array(
+    				'code'=>  urlencode($auth_code),
+    				'client_id'=>  urlencode($this->key),
+    				'client_secret'=>  urlencode($this->secret),
+    				'redirect_uri'=>  urlencode($redirect_uri),
+    				'grant_type'=>  urlencode('authorization_code')
 		);
+		$post = '';
+		foreach($fields as $key=>$value) { $post .= $key.'='.$value.'&'; }
+		$post = rtrim($post,'&');
 
-		$result = SimpleSAML_Utilities::fetch('https://consent.live.com/AccessToken.aspx', $context);
+		$curl = curl_init();
+		curl_setopt($curl,CURLOPT_URL,'https://login.live.com/oauth20_token.srf');
+		curl_setopt($curl,CURLOPT_POST,5);
+		curl_setopt($curl,CURLOPT_POSTFIELDS,$post);
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER,TRUE);
+		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER,0);
+		$result = curl_exec($curl);
+		curl_close($curl);
 
-		parse_str($result, $response);
+		$response =  json_decode($result);
+		$accesstoken = $response->access_token;
+		SimpleSAML_Logger::debug('LIVE AccessToken: '.$accesstoken);
 
-		// error checking of $response to make sure we can proceed
-		if (!array_key_exists('wrap_access_token',$response))
-			throw new Exception('[' . $response['error_code'] . '] ' . $response['wrap_error_reason'] .
-				"\r\nNo wrap_access_token returned - cannot proceed\r\n" . $response['internal_info']);
+		// $url = 'https://apis.live.net/v5.0/me/contacts?access_token='.$accesstoken.'';
+		$url = 'https://apis.live.net/v5.0/me?access_token='.$accesstoken.'';
+		$xmlresponse =  $this->curl_file_get_contents($url);
+		SimpleSAML_Logger::debug('LIVE Response: '.$xmlresponse);
 
-		SimpleSAML_Logger::debug("Got an access token from the OAuth WRAP service provider [" .
-			$response['wrap_access_token'] . "] for user [" . $response['uid'] . "]");
-
-		// Documentation at: http://msdn.microsoft.com/en-us/library/ff751708.aspx
-		$opts = array('http' => array('header' => "Accept: application/json\r\nAuthorization: WRAP access_token=" .
-						$response['wrap_access_token'] . "\r\n"));
-		$data = SimpleSAML_Utilities::fetch('https://apis.live.net/V4.1/cid-'. $response['uid'] . '/Profiles',$opts);
-                $userdata = json_decode($data, TRUE);
-
-		$attributes = array();
-		$attributes['windowslive_uid'] = array($response['uid']);
-		$attributes['windowslive_targetedID'] = array('http://windowslive.com!' . $response['uid']);
-		$attributes['windowslive_user'] = array($response['uid'] . '@windowslive.com');
-
-		if (array_key_exists('Entries',$userdata)) {
-			foreach($userdata['Entries'][0] AS $key => $value) {
-				if (is_string($value))
-					$attributes['windowslive.' . $key] = array((string)$value);
-			}
-
-			if (array_key_exists('Emails', $userdata['Entries'][0]))
-				$attributes['windowslive_mail'] = array($userdata['Entries'][0]['Emails'][0]['Address']);
-
+		$xml = json_decode($xmlresponse, true);
+		foreach($xml as $key => $value)
+		{
+			SimpleSAML_Logger::debug('LIVE '.$key.':'.$value);
 		}
-
-
-		SimpleSAML_Logger::debug('LiveID Returned Attributes: '. implode(", ",array_keys($attributes)));
-
+		$attributes = array();
+		$attributes['windowslive_uid'] = array($xml['id']);
+		//$attributes['uid']=$attributes['windowslive_uid'];
+		$attributes['windowslive_name'] = array($xml['name']);
+		//$attributes['cn']=$attributes['windowslive_name'];
+		$attributes['windowslive_first_name'] = array($xml['first_name']);
+		//$attributes['givenName']=$attributes['windowslive_first_name'];
+		$attributes['windowslive_last_name'] = array($xml['last_name']);
+		//$attributes['sn']=$attributes['windowslive_last_name'];
+		//$attributes['windowslive_link'] = array($xml['link']);
+		$attributes['windowslive_email'] = array($xml['emails']['account']);
+		//$attributes['mail']=$attributes['windowslive_email'];
+		/*$attributes['windowslive_birth_month'] = array($xml['birth_month']);
+		$attributes['windowslive_gender'] = array($xml['gender']);
+		$attributes['windowslive_city'] = array($xml['addresses']['personal']['city']);
+		$attributes['windowslive_state'] = array($xml['addresses']['personal']['state']);
+		$attributes['windowslive_region'] = array($xml['addresses']['personal']['region']);
+		$attributes['windowslive_locale'] = array($xml['locale']);*/
+		//$attributes['language']=$attributes['windowslive_locale'];
+		//$attributes['windowslive_updated_time'] = array($xml['updated_time']);
+		$attributes['windowslive_user'] = array($xml['id'] . '@live.com');
+		
 		$state['Attributes'] = $attributes;
+
 	}
 
 }

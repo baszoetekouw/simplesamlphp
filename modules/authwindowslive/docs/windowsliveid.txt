@@ -1,20 +1,110 @@
-Using the Windows Live ID authentication source with simpleSAMLphp
-==================================================================
+Windows Live OAuth API
 
-Remember to configure `authsources.php`, with both your Client ID and Secret key.
 
-To get an API key and a secret, register the application at:
+References:
+- http://msdn.microsoft.com/en-us/library/live/hh243641
+- http://msdn.microsoft.com/en-us/library/live/hh243647.aspx
+- http://msdn.microsoft.com/en-us/library/bb676633.aspx
+- http://msdn.microsoft.com/en-us/library/bb676626.aspx
 
- * <http://msdn.microsoft.com/en-us/library/ff751474.aspx>
- * <https://manage.dev.live.com>
+HOWTO:
+- register your app at https://manage.dev.live.com - https://account.live.com/developers/applications/index
+- put client_id and secret into authwindowslive  simplesamlphp/authsources.php
 
-## Testing authentication
+ 
+Flux Schema:
+1) request access token
 
-On the SimpleSAMLphp frontpage, go to the *Authentication* tab, and use the link:
+https://login.live.com/oauth20_authorize.srf?client_id=00000000480E9987&redirect_uri=https%3A%2F%2Flogin.sso.garr.it%2FGarrSSO%2Fmodule.php%2Fauthwindowslive%2Flinkback.php&response_type=code&scope=wl.signin%20wl.basic
 
-  * *Test configured authentication sources*
 
-Then choose the *windowsliveid* authentication source.
+2) request access token returned in URL
 
-Expected behaviour would then be that you are sent to Windows Live ID and asked to login.
+b9c9014e-f49e-f9cd-56b4-d8dcc6b8857b
 
+
+3) you must put returned code into access token request URL
+
+https://login.live.com/oauth20_token.srf?client_id=00000000480E9987&redirect_uri=https%3A%2F%2Flogin.sso.garr.it%2FGarrSSO%2Fmodule.php%2Fauthwindowslive%2Flinkback.php&client_secret=R4OrfFbnhOl1RQaPWjCC5EpcF5mCakpu&code=b9c9014e-f49e-f9cd-56b4-d8dcc6b8857b&grant_type=authorization_code
+
+
+4) access token generation
+
+URL access token request:
+
+https://login.live.com/oauth20_token.srf?client_id=00000000480E9987&redirect_uri=https%3A%2F%2Flogin.sso.garr.it%2FGarrSSO%2Fmodule.php%2Fauthwindowslive%2Flinkback.php&client_secret=R4OrfFbnhOl1RQaPWjCC5EpcF5mCakpu&code=b9c9014e-f49e-f9cd-56b4-d8dcc6b8857b&grant_type=authorization_code
+
+page content:
+
+{"token_type":"bearer","expires_in":3600,"scope":"wl.signin wl.basic wl.legacy_profile_view wl.messenger","access_token":"EwA4Aq1DBAAUGCCXc8wU/zFu9QnLdZXy+YnElFkAAcXneQNiSpgoZXbz6FOkM9rmfgoHPwZggmNfKC0kJHLiYjVtIK++IIN/bXWFmVpuILSz9mWVaqjDPflh5DmGpqBVLHUskEDwoohFpwjq99PjlpdtYyvnHQEv048F3gix08KbUArEZitNwPi/950XDa5EKkp/tnrCOtqdnwEn02me8Z/fUb8tFlw1BPqB6dxxX4O/eSWVJF3GmVx/DJnx0/2L/mQEfRC401cNyJe2KZtlgzfDpPj83jRkCyaZr/v7ceQ1ydH5Yqx+znFeVYSGFoPzmjvgXYVJcaZcWFTNOy+K8qFrYNbM7YKEGoVVe9R90paEZHf61vJK1GO6l+NjoSsDZgAACGcUtlCd9lNiCAGy1UN0iIS0be2IzmlHPljR4aPJbD6jTH2Kofd/Nje7cVvlzFcZc1zFnCCBahVN6bDBb1B2TmR5CfSu0cGpjviD5Y8VGaODqlxL0zqyaLcU24QOtvVZCnF+aw86XZ/LcD8OXZIwI5BnzGZKQPNiPecGSGy8SvTfzm/uJ/TDLJtm8rjeFp/bL0UQFl9LZVujCIMkB6XspR8LZxiGhpaBa8Qwsh0SfPeFNtA5Htn1Q1c8CnhNl34BrI1rxZKAK0XZq5VRQLco3rW0QeUG6wPWA2EFGz9PMHAzppBHhZiIEsAXp0y7l5KY2mgNhUlsnjhluhZEGbWIavTONpNBjyrpLhr3ftDtN2w1ZOYAAA==","authentication_token":"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAiLCJ0eXAiOiJKV1QifQ.eyJ2ZXIiOjEsImlzcyI6InVybjp3aW5kb3dzOmxpdmVpZCIsImV4cCI6MTM2NzY2NDE5NSwidWlkIjoiZWY4ZDRlMGZkOTA5ZTE2MzBjN2M2ZWViNDA2MGY2MjAiLCJhdWQiOiJsb2dpbi5zc28uZ2Fyci5pdCIsInVybjptaWNyb3NvZnQ6YXBwdXJpIjoiYXBwaWQ6Ly8wMDAwMDAwMDQ4MEU5OTg3IiwidXJuOm1pY3Jvc29mdDphcHBpZCI6IjAwMDAwMDAwNDgwRTk5ODcifQ.rH40qty58Sj-IVQRU_QAgpCGkStmOGFrouhN8Y9vcU4"}
+
+
+5) client login using returned access token
+
+https://apis.live.net/v5.0/me?access_token=EwA4Aq1DBAAUGCCXc8wU/zFu9QnLdZXy+YnElFkAAcXneQNiSpgoZXbz6FOkM9rmfgoHPwZggmNfKC0kJHLiYjVtIK++IIN/bXWFmVpuILSz9mWVaqjDPflh5DmGpqBVLHUskEDwoohFpwjq99PjlpdtYyvnHQEv048F3gix08KbUArEZitNwPi/950XDa5EKkp/tnrCOtqdnwEn02me8Z/fUb8tFlw1BPqB6dxxX4O/eSWVJF3GmVx/DJnx0/2L/mQEfRC401cNyJe2KZtlgzfDpPj83jRkCyaZr/v7ceQ1ydH5Yqx+znFeVYSGFoPzmjvgXYVJcaZcWFTNOy+K8qFrYNbM7YKEGoVVe9R90paEZHf61vJK1GO6l+NjoSsDZgAACGcUtlCd9lNiCAGy1UN0iIS0be2IzmlHPljR4aPJbD6jTH2Kofd/Nje7cVvlzFcZc1zFnCCBahVN6bDBb1B2TmR5CfSu0cGpjviD5Y8VGaODqlxL0zqyaLcU24QOtvVZCnF+aw86XZ/LcD8OXZIwI5BnzGZKQPNiPecGSGy8SvTfzm/uJ/TDLJtm8rjeFp/bL0UQFl9LZVujCIMkB6XspR8LZxiGhpaBa8Qwsh0SfPeFNtA5Htn1Q1c8CnhNl34BrI1rxZKAK0XZq5VRQLco3rW0QeUG6wPWA2EFGz9PMHAzppBHhZiIEsAXp0y7l5KY2mgNhUlsnjhluhZEGbWIavTONpNBjyrpLhr3ftDtN2w1ZOYAAA==
+
+6) returned user's profile
+
+{
+
+  "id": "fa5b69d1aa52015d",
+
+  "name": "cristiano valli",
+
+  "first_name": "cristiano",
+
+  "last_name": "valli",
+
+  "link": "https://profile.live.com/",
+
+  "birth_month": null,
+
+  "gender": null,
+
+  "emails": {
+
+     "account": "ulisse122@hotmail.com",
+
+     "personal": null
+
+  },
+
+  "addresses": {
+
+     "personal": {
+
+        "city": null,
+
+        "state": null,
+
+        "region": "Italia"
+
+     },
+
+     "business": {
+
+        "city": null,
+
+        "state": null,
+
+        "region": null
+
+     }
+
+  },
+
+  "locale": "it_IT",
+
+  "updated_time": "2013-02-08T16:37:55+0000"
+
+}
+
+
+7) login into user's profile with returned id
+
+https://profile.live.com/P.mvc#!/cid-fa5b69d1aa52015d/
+
+
+
+
+attribute map's are in config dir

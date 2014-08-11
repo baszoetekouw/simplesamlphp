@@ -2,27 +2,29 @@
 
 /**
  * Handle linkback() response from Windows Live ID.
+ *
+ * @author Cristiano Valli, Consortium GARR.
+ * @package simpleSAMLphp
+ * @version $Id$
  */
+
+
+
 
 if (array_key_exists('wrap_client_state', $_REQUEST)) {
 	$stateId = $_REQUEST['wrap_client_state'];
-	
-	// sanitize the input
-	$sid = SimpleSAML_Utilities::parseStateID($stateId);
-	if (!is_null($sid['url'])) {
-		SimpleSAML_Utilities::checkURLAllowed($sid['url']);
-	}
-
 	$state = SimpleSAML_Auth_State::loadState($stateId, sspmod_authwindowslive_Auth_Source_LiveID::STAGE_INIT);
 } else {
 	throw new Exception('Lost OAuth-WRAP Client State');
 }
 
-// http://msdn.microsoft.com/en-us/library/ff749771.aspx
-if (array_key_exists('wrap_verification_code', $_REQUEST)) {
+
+// http://msdn.microsoft.com/en-us/library/live/hh243641
+if (array_key_exists('code', $_REQUEST)) {
 
 	// Good
-	$state['authwindowslive:wrap_verification_code'] = $_REQUEST['wrap_verification_code'];
+	$state['authwindowslive:wrap_verification_code'] = $_REQUEST['code'];
+	SimpleSAML_Logger::debug('LIVE code => ' . $_REQUEST['code']);
 
 	if (array_key_exists('exp', $_REQUEST))
 		$state['authwindowslive:wrap_exp'] = $_REQUEST['exp'];
@@ -39,9 +41,15 @@ if (array_key_exists('wrap_verification_code', $_REQUEST)) {
 	throw new Exception('Authentication failed: [' . $_REQUEST['error_code'] . '] ' . $_REQUEST['wrap_error_reason']);
 }
 
+
+if (isset($state))
+{
+SimpleSAML_Logger::debug('LIVE stateId => ' . $state );
+
 /* Find authentication source. */
 assert('array_key_exists(sspmod_authwindowslive_Auth_Source_LiveID::AUTHID, $state)');
 $sourceId = $state[sspmod_authwindowslive_Auth_Source_LiveID::AUTHID];
+SimpleSAML_Logger::debug('LIVE sourceID => ' . $sourceId);
 
 $source = SimpleSAML_Auth_Source::getById($sourceId);
 if ($source === NULL) {
@@ -52,3 +60,4 @@ $source->finalStep($state);
 
 SimpleSAML_Auth_Source::completeAuth($state);
 
+}
