@@ -5,7 +5,7 @@
  * @author Sylvain MEDARD
  * @version $Id$
  */
-set_include_path(get_include_path() . PATH_SEPARATOR . '/var/idpgoogle/modules/authgoogle/extlib/');
+set_include_path(get_include_path() . PATH_SEPARATOR . 'path_to_simplesamlphp/modules/authgoogle/extlib/');
 require_once 'Exception.php';
 require_once 'Pem.php';
 require_once 'Utils.php';
@@ -190,20 +190,7 @@ class sspmod_authgoogle_Auth_Source_Google extends SimpleSAML_Auth_Source {
 		$id_token = $response['id_token'];
 		if (!isset($id_token)) throw new SimpleSAML_Error_AuthSource($this->authId, 'Google Error : No id_token');
 		SimpleSAML_Logger::debug('Google DEBUG : id_Token: '.$id_token);
-	
-		
-		// Decode ID_token
-		// http://openid.net/specs/openid-connect-basic-1_0.html#IDToken
-		$id_array = explode('.', $id_token);
-		SimpleSAML_Logger::debug('Google DEBUG : id_array: '.$id_array[1]);
-		$id_body = base64_decode($id_array[1]);
-		SimpleSAML_Logger::debug('Google DEBUG : id_body: '.$id_body);
-		$idb = json_decode($id_body,true);
-		
-		foreach($idb as $key => $value) 
-		{
-			SimpleSAML_Logger::debug('Google DEBUG : id_Token ' . $key .' : ' .$value);
-		}
+
 	
 		// DEBUG only : compare id_token with Google token_endpoint
 		// The tokeninfo endpoint is useful for debugging but for production purposes, we recommend that you perform the validation locally
@@ -219,7 +206,7 @@ class sspmod_authgoogle_Auth_Source_Google extends SimpleSAML_Auth_Source {
 		SimpleSAML_Logger::debug('DEBUG :id_token decoded from google endpoint'. $responseidtoken);
 		*/
 		
-		// Verify id_token
+		// Decode & Verify id_token
 		// http://openid.net/specs/openid-connect-basic-1_0.html#IDToken
 		 $this->verifyIdToken($id_token, $this->key);
 
