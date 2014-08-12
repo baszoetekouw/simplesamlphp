@@ -5,6 +5,11 @@
  * @author Sylvain MEDARD
  * @version $Id$
  */
+set_include_path(get_include_path() . PATH_SEPARATOR . '/var/idpgoogle/modules/authgoogle/extlib/');
+require_once 'Exception.php';
+require_once 'Pem.php';
+require_once 'Utils.php';
+
  
 class sspmod_authgoogle_Auth_Source_Google extends SimpleSAML_Auth_Source {
 
@@ -20,17 +25,32 @@ class sspmod_authgoogle_Auth_Source_Google extends SimpleSAML_Auth_Source {
 	
 	const ISSUER = 'accounts.google.com';
 	
+	const federated_signon_certs_url = 'https://www.googleapis.com/oauth2/v1/certs';
+	const MAX_TOKEN_LIFETIME_SECS = 3600;
+	const CLOCK_SKEW_SECS = 180;
+	
 	private $state;
 	private $stateID;
 	
-	// Google Developper Console :
-	// https://code.google.com/apis/console
+	/**
+	 * Client ID & Client secret 
+	 * from Google Developper Console : 
+	 * https://code.google.com/apis/console
+	 */ 
 	private $key;
 	private $secret;
 	
-	// Redirect_uri
+	/** 
+	 * Redirect_uri
+	 */
 	private $linkback; 
 	
+	/**
+	 * Curl operations
+	 * 
+	 * @param $url       url of the operation
+	 * @return           repsonse of the curl operation
+	 */
 	private function curl_file_get_contents($url)
 	{
     		$ch = curl_init();
@@ -201,14 +221,14 @@ class sspmod_authgoogle_Auth_Source_Google extends SimpleSAML_Auth_Source {
 		
 		// Verify id_token
 		// http://openid.net/specs/openid-connect-basic-1_0.html#IDToken
-		//[...]
+		 $this->verifyIdToken($id_token, $this->key);
 
 		// Retrieve user info
 		// https://developers.google.com/+/api/latest/people/getOpenIdConnect
 		if ($response['expires_in']< time()) {
 			$url = ('https://www.googleapis.com/plus/v1/people/me/openIdConnect?access_token='.$accesstoken);
 			$xmlresponse =  $this->curl_file_get_contents($url);
-			SimpleSAML_Logger::debug('Google Response: '.$xmlresponse);
+			//SimpleSAML_Logger::debug('Google Response: '.$xmlresponse);
 			
 			if (!isset($xmlresponse)) {
 				throw new SimpleSAML_Error_AuthSource($this->authId, 'Error getting user profile.');
@@ -217,10 +237,11 @@ class sspmod_authgoogle_Auth_Source_Google extends SimpleSAML_Auth_Source {
 		
 		// Getting user's attributes from Google response
 		$userinfo = json_decode($xmlresponse, true);
-		foreach($userinfo as $key => $value)
+		/*foreach($userinfo as $key => $value)
 		{
 			SimpleSAML_Logger::debug('Google '.$key.':'.$value);
-		}
+		}*/
+		SimpleSAML_Logger::debug('Google userinfo : ' .  var_export($userinfo, true));
 		$attributes = array();
 		$attributes['google_uid'] = array($userinfo['sub']);
 		$attributes['google_name'] = array($userinfo['name']);
@@ -231,6 +252,153 @@ class sspmod_authgoogle_Auth_Source_Google extends SimpleSAML_Auth_Source {
 		$state['Attributes'] = $attributes;
 
 	}
+	
+	private function verifyIdToken($id_token, $audience = null)
+	  {
+		if (!$id_token) {
+		  throw new Google_Auth_Exception('No id_token');
+		}
+		$response =  $this->curl_file_get_contents(self::federated_signon_certs_url);
+		$certs = json_decode($response, true);
+	   /* foreach($certs as $key => $value){
+						SimpleSAML_Logger::debug('certs keys:' . $key . ' value :  ' . $value);
+		}*/
+		if (!$audience) {
+		  $audience = $this->key;
+		}
+
+		return $this->verifySignedJwtWithCerts($id_token, $certs, $audience, self::ISSUER);
+	  }
+
+	  /**
+	* Verifies the id token, returns the verified token contents.
+	*
+	* @param $jwt the token
+	* @param $certs array of certificates
+	* @param $required_audience the expected consumer of the token
+	* @param [$issuer] the expected issues, defaults to Google
+	* @param [$max_expiry] the max lifetime of a token, defaults to MAX_TOKEN_LIFETIME_SECS
+	* @return token information if valid, false if not
+	*/
+	  private function verifySignedJwtWithCerts(
+		  $jwt,
+		  $certs,
+		  $required_audience,
+		  $issuer = null,
+		  $max_expiry = null
+	  ) {
+		if (!$max_expiry) {
+		  // Set the maximum time we will accept a token for.
+		  $max_expiry = self::MAX_TOKEN_LIFETIME_SECS;
+		}
+
+		$segments = explode(".", $jwt);
+		if (count($segments) != 3) {
+		  throw new Google_Auth_Exception("Wrong number of segments in token: $jwt");
+		}
+		$signed = $segments[0] . "." . $segments[1];
+		$signature = Google_Utils::urlSafeB64Decode($segments[2]);
+
+		// Parse envelope.
+		$envelope = json_decode(Google_Utils::urlSafeB64Decode($segments[0]), true);
+		if (!$envelope) {
+		  throw new Google_Auth_Exception("Can't parse token envelope: " . $segments[0]);
+		}
+
+		// Parse token
+		$json_body = Google_Utils::urlSafeB64Decode($segments[1]);
+		$payload = json_decode($json_body, true);
+		if (!$payload) {
+		  throw new Google_Auth_Exception("Can't parse token payload: " . $segments[1]);
+		}
+
+		// Check signature
+		$verified = false;
+		foreach ($certs as $keyName => $pem) {
+		  $public_key = new Google_Verifier_Pem($pem);
+		  if ($public_key->verify($signed, $signature)) {
+			$verified = true;
+			break;
+		  }
+		}
+
+		if (!$verified) {
+		  throw new Google_Auth_Exception("Invalid token signature: $jwt");
+		}
+
+		// Check issued-at timestamp
+		$iat = 0;
+		if (array_key_exists("iat", $payload)) {
+		  $iat = $payload["iat"];
+		}
+		if (!$iat) {
+		  throw new Google_Auth_Exception("No issue time in token: $json_body");
+		}
+		$earliest = $iat - self::CLOCK_SKEW_SECS;
+
+		// Check expiration timestamp
+		$now = time();
+		$exp = 0;
+		if (array_key_exists("exp", $payload)) {
+		  $exp = $payload["exp"];
+		}
+		if (!$exp) {
+		  throw new Google_Auth_Exception("No expiration time in token: $json_body");
+		}
+		SimpleSAML_Logger::debug($now+$max_expiry . ' >= ' . $exp . ' ?');
+		if ($exp > $now + $max_expiry) {
+		  throw new Google_Auth_Exception(
+			  sprintf("Expiration time too far in future: %s", $json_body)
+		  );
+		}
+
+		$latest = $exp + self::CLOCK_SKEW_SECS;
+		if ($now < $earliest) {
+		  throw new Google_Auth_Exception(
+			  sprintf(
+				  "Token used too early, %s < %s: %s",
+				  $now,
+				  $earliest,
+				  $json_body
+			  )
+		  );
+		}
+		if ($now > $latest) {
+		  throw new Google_Auth_Exception(
+			  sprintf(
+				  "Token used too late, %s > %s: %s",
+				  $now,
+				  $latest,
+				  $json_body
+			  )
+		  );
+		}
+
+		$iss = $payload['iss'];
+		if ($issuer && $iss != $issuer) {
+		  throw new Google_Auth_Exception(
+			  sprintf(
+				  "Invalid issuer, %s != %s: %s",
+				  $iss,
+				  $issuer,
+				  $json_body
+			  )
+		  );
+		}
+
+		// Check audience
+		$aud = $payload["aud"];
+		if ($aud != $required_audience) {
+		  throw new Google_Auth_Exception(
+			  sprintf(
+				  "Wrong recipient, %s != %s:",
+				  $aud,
+				  $required_audience,
+				  $json_body
+			  )
+		  );
+		}
+	  }
 
 }
 

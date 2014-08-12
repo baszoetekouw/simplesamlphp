@@ -39,8 +39,6 @@ if (array_key_exists('code', $_REQUEST)) {
 
 if (isset($state))
 {
-SimpleSAML_Logger::debug('Google auth stateId => ' . $state );
-
 /* Find authentication source. */
 assert('array_key_exists(sspmod_authgoogle_Auth_Source_Google::AUTHID, $state)');
 $sourceId = $state[sspmod_authgoogle_Auth_Source_Google::AUTHID];
