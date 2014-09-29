@@ -5,7 +5,7 @@
  * @author Sylvain MEDARD
  * @version $Id$
  */
-set_include_path(get_include_path() . PATH_SEPARATOR . 'path_to_simplesamlphp/modules/authgoogle/extlib/');
+set_include_path(get_include_path() . PATH_SEPARATOR . dirname(dirname(dirname(dirname(__FILE__)))) . '/extlib/');
 require_once 'Exception.php';
 require_once 'Pem.php';
 require_once 'Utils.php';
