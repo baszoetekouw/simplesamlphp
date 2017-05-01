@@ -1,0 +1,45 @@
+GOOGLE OpenID connect auth module
+
+---------------------------
+References
+Google specification : https://developers.google.com/accounts/docs/OAuth2Login
+Google client library : https://github.com/google/google-api-php-client
+Scopes : https://developers.google.com/+/api/oauth#login-scopes
+openid connect specification : http://openid.net/specs/openid-connect-core-1_0.html
+
+---------------------------
+Register my application on Google  
+
+https://code.google.com/apis/console
+
+Create a project to get : client_id & client_secret
+Add it into the file :/config/authsources.php
+
+'google' => array(
+		'authgoogleOIDC:GoogleOIDC',
+		'key' =>'...apps.googleusercontent.com',
+		'secret' => '.....',
+),
+
+---------------------------
+Module based on Google client library :
+https://github.com/google/google-api-php-client
+
+
+returned Google attributes :
+log:
+Google Response: {
+ "kind": "plus#personOpenIdConnect",
+ "gender": "male",
+ "sub": "...",
+ "name": ".....",
+ "given_name": "Sylvain",
+ "family_name": "Medard",
+ "profile": "https://plus.google.com/...",
+ "picture": "https://l...",
+ "email": "...",
+ "email_verified": "true",
+ "locale": "fr"
+}
+
+
